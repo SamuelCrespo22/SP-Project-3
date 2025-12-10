@@ -40,13 +40,23 @@ def setup_ckks():
 def holder_encrypt_ckks(context, salary, bonus, filename):
     enc_s = ts.ckks_vector(context, salary)
     enc_b = ts.ckks_vector(context, bonus)
+
+    ser_s = enc_s.serialize()
+    ser_b = enc_b.serialize()
+    
     with open(filename, "wb") as f:
-        f.write(enc_s.serialize() + b":::" + enc_b.serialize())
+        f.write(len(ser_s).to_bytes(4, 'big')) 
+        f.write(ser_s)
+        f.write(ser_b)
 
 def analyzer_process_ckks(context, in_file, out_file):
     with open(in_file, "rb") as f:
-        data = f.read()
-        bytes_s, bytes_b = data.split(b":::")
+        # Lê os primeiros 4 bytes para descobrir o tamanho de 's'
+        size_s = int.from_bytes(f.read(4), 'big')
+        # Lê exatamente 'size_s' bytes para obter 's'
+        bytes_s = f.read(size_s)
+        # O restante do arquivo é 'b'
+        bytes_b = f.read()
     
     enc_s = ts.ckks_vector_from(context, bytes_s)
     enc_b = ts.ckks_vector_from(context, bytes_b)
@@ -87,11 +97,10 @@ print(f"Times: Enc={t_enc:.4f}s | Proc={t_proc:.4f}s | Dec={t_dec:.4f}s\n")
 print("=== SCHEME 2: BFV ===")
 
 def setup_bfv():
-    # 8192 slots (N) fits the dataset exactly
     context = ts.context(
         ts.SCHEME_TYPE.BFV, 
-        poly_modulus_degree=8192, 
-        plain_modulus=536903681
+        poly_modulus_degree=16384,
+        plain_modulus=1099511922689, # no overflow
     )
     context.generate_galois_keys()
     context.generate_relin_keys()
@@ -100,34 +109,37 @@ def setup_bfv():
 def holder_encrypt_bfv(context, salary, bonus, filename):
     enc_s = ts.bfv_vector(context, salary)
     enc_b = ts.bfv_vector(context, bonus)
+
+    ser_s = enc_s.serialize()
+    ser_b = enc_b.serialize()
+    
     with open(filename, "wb") as f:
-        f.write(enc_s.serialize() + b":::" + enc_b.serialize())
+        f.write(len(ser_s).to_bytes(4, 'big'))
+        f.write(ser_s)
+        f.write(ser_b)
 
 def analyzer_process_bfv(context, in_file, out_file):
     with open(in_file, "rb") as f:
-        data = f.read()
-        bytes_s, bytes_b = data.split(b":::")
+        size_s = int.from_bytes(f.read(4), 'big')
+        bytes_s = f.read(size_s)
+        bytes_b = f.read()
     
     enc_s = ts.bfv_vector_from(context, bytes_s)
     enc_b = ts.bfv_vector_from(context, bytes_b)
     
-    # (Salary + 0.1 * Bonus) * 1.05 = (Salary + B/10) * 21/20  ->  (10*S + B) * 21 / 200
-    enc_result = (enc_s.mul(10) + enc_b).mul(21)
+    # (10*S + B) * 21
+    enc_result = (enc_s.mul(10) + enc_b).mul(21).sum()
     
-    # NOTE: No sum here to avoid integer overflow of the plain_modulus.
-    # Return the vector and sum after decryption.
     with open(out_file, "wb") as f:
         f.write(enc_result.serialize())
 
 def holder_decrypt_bfv(context, filename):
     with open(filename, "rb") as f:
         bytes_res = f.read()
+
     enc_res = ts.bfv_vector_from(context, bytes_res)
     
-    numerators = enc_res.decrypt()
-
-    # Sum in plaintext
-    total_numerator = sum(numerators)
+    total_numerator = enc_res.decrypt()[0]
     
     # Apply the division by 200 (from the 10 * 20 scaling factor)
     return total_numerator / 200.0
