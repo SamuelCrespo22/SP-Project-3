@@ -9,7 +9,7 @@ import os
 # DATASET CONFIGURATION
 # ==============================================================================
 
-df = pd.read_csv("dataset/dataset.csv")
+df = pd.read_csv("datasets/dataset.csv")
 salaries_list = df["salary_cents"].tolist()
 bonus_list = df["bonus_cents"].tolist()
 
