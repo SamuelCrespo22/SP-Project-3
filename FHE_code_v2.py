@@ -351,7 +351,6 @@ def analyzer_process_bfv_addition(context, in_file, out_file):
     with open(in_file, "rb") as f:
         size_s = int.from_bytes(f.read(4), 'big')
         bytes_s = f.read(size_s)
-        bytes_b = f.read()  # We still need to read bonus data
     
     enc_s = ts.bfv_vector_from(context, bytes_s)
     enc_salary_sum = enc_s.sum()
@@ -403,8 +402,7 @@ def analyzer_process_ckks_multiplication(context, in_file, out_file):
     with open(in_file, "rb") as f:
         size_s = int.from_bytes(f.read(4), 'big')
         bytes_s = f.read(size_s)
-        bytes_b = f.read()  # We still need to read bonus data
-    
+
     enc_s = ts.ckks_vector_from(context, bytes_s)
     enc_salary_mul = enc_s.mul(2)
     enc_result = enc_salary_mul.sum()
