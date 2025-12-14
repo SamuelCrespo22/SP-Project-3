@@ -21,5 +21,5 @@ def gerar_dataset(n):
 
     return df
 
-df = gerar_dataset(8192)
-df.to_csv("dataset.csv", index=False)
+df = gerar_dataset(131072)
+df.to_csv("dataset_131072.csv", index=False)
